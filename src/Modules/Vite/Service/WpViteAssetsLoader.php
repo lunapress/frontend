@@ -6,9 +6,10 @@ namespace LunaPress\Frontend\Modules\Vite\Service;
 use LunaPress\CoreContracts\Hook\IActionManager;
 use LunaPress\CoreContracts\Support\WpFunction\IWpFunctionExecutor;
 use LunaPress\Wp\AssetsContracts\IAssetDependency;
-use LunaPress\Wp\AssetsContracts\WpEnqueueScriptModule\Enum\WpEnqueueScriptModuleImport;
+use LunaPress\Wp\AssetsContracts\IAssetDependencyFactory;
+use LunaPress\Wp\AssetsContracts\WpEnqueueScript\IWpEnqueueScriptFactory;
+use LunaPress\Wp\AssetsContracts\WpEnqueueScriptModule\IWpEnqueueScriptModuleDep;
 use LunaPress\Wp\AssetsContracts\WpEnqueueScriptModule\IWpEnqueueScriptModuleFactory;
-use LunaPress\Wp\AssetsContracts\WpEnqueueScriptModule\IWpEnqueueScriptModuleDepsFactory;
 use LunaPress\Wp\AssetsContracts\WpEnqueueStyle\IWpEnqueueStyleFactory;
 use LunaPress\Wp\AssetsContracts\WpRegisterScript\IWpRegisterScriptFactory;
 use LunaPress\Frontend\Modules\Vite\Constants;
@@ -31,7 +32,8 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
         private IWpEnqueueScriptModuleFactory $enqueueScriptModuleFactory,
         private IWpRegisterScriptFactory $registerScriptFactory,
         private IWpEnqueueStyleFactory $enqueueStyleFactory,
-        private IWpEnqueueScriptModuleDepsFactory $wpEnqueueScriptModuleDepsFactory,
+        private IAssetDependencyFactory $assetDependencyFactory,
+        private IWpEnqueueScriptFactory $enqueueScriptFactory,
         private IViteConfig $config,
     ) {
     }
@@ -39,14 +41,48 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
     /**
      * @inheritDoc
      */
-    public function connect(array $entryPoints, array $dependency = [], bool $isAdmin = false): void
+    public function connect(array $entryPoints, bool $isAdmin = false, array $dependencies = []): void
     {
+        $normalizedDependencies = $this->normalizeDependencies($dependencies);
+
         if ($this->viteModeDetector->isDev()) {
             $this->connectDev($entryPoints, $isAdmin);
-            return;
+        } else {
+            $this->connectProd($entryPoints, $normalizedDependencies);
+        }
+    }
+
+    /**
+     * @param array<IWpEnqueueScriptModuleDep|IAssetDependency> $rawDependencies
+     * @return array<IWpEnqueueScriptModuleDep|IAssetDependency>
+     */
+    private function normalizeDependencies(array $rawDependencies): array
+    {
+        $dependencies = $rawDependencies;
+
+        if (count($rawDependencies) === 0) {
+            $dependencies = array_map(fn($handle) => $this->assetDependencyFactory->make($handle), Constants::DEFAULT_FRONTEND_DEPS);
         }
 
-        $this->connectProd($entryPoints, $dependency);
+        return $dependencies;
+    }
+
+    /**
+     * @param array<IAssetDependency|IWpEnqueueScriptModuleDep> $dependencies
+     * @return void
+     */
+    private function connectDependencies(array $dependencies): void
+    {
+        foreach ($dependencies as $dependency) {
+            if (!($dependency instanceof IAssetDependency)) {
+                continue;
+            }
+
+            $this->wpFunctionExecutor->execute(
+                $this->enqueueScriptFactory
+                    ->make($dependency->getHandle())
+            );
+        }
     }
 
     /**
@@ -92,7 +128,7 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
 
     /**
      * @param ViteEntryPoint[] $entryPoints
-     * @param IAssetDependency[] $dependencies
+     * @param array<IWpEnqueueScriptModuleDep|IAssetDependency> $dependencies
      */
     private function connectProd(array $entryPoints, array $dependencies): void
     {
@@ -111,14 +147,15 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
 
             // JS
             if (!preg_match('/\.css$/', $entry->getFile())) {
-                $moduleDependencies = array_map(
-                    fn($dependency) =>
-                    $this->wpEnqueueScriptModuleDepsFactory
-                        ->make()
-                        ->id($dependency->getHandle())
-                        ->import(WpEnqueueScriptModuleImport::STATIC),
-                    $dependencies
+                /**
+                 * @var IWpEnqueueScriptModuleDep[] $moduleDependencies
+                 */
+                $moduleDependencies = array_filter(
+                    $dependencies,
+                    fn($dependency) => $dependency instanceof IWpEnqueueScriptModuleDep,
                 );
+
+                $this->connectDependencies($dependencies);
 
                 $this->wpFunctionExecutor->execute(
                     $this->enqueueScriptModuleFactory
