@@ -5,8 +5,10 @@ namespace LunaPress\Frontend\Modules\Vite\Service;
 
 use LunaPress\CoreContracts\Hook\IActionManager;
 use LunaPress\CoreContracts\Support\WpFunction\IWpFunctionExecutor;
+use LunaPress\FrontendContracts\Vite\IViteEntryPoint;
 use LunaPress\Wp\AssetsContracts\IAssetDependency;
 use LunaPress\Wp\AssetsContracts\IAssetDependencyFactory;
+use LunaPress\Wp\AssetsContracts\WpAssetHandle;
 use LunaPress\Wp\AssetsContracts\WpEnqueueScript\IWpEnqueueScriptFactory;
 use LunaPress\Wp\AssetsContracts\WpEnqueueScriptModule\IWpEnqueueScriptModuleDep;
 use LunaPress\Wp\AssetsContracts\WpEnqueueScriptModule\IWpEnqueueScriptModuleFactory;
@@ -15,7 +17,6 @@ use LunaPress\Wp\AssetsContracts\WpRegisterScript\IWpRegisterScriptFactory;
 use LunaPress\Frontend\Modules\Vite\Constants;
 use LunaPress\FrontendContracts\Vite\IViteAssetsLoader;
 use LunaPress\FrontendContracts\Vite\IViteConfig;
-use LunaPress\FrontendContracts\Vite\ViteEntryPoint;
 use LunaPress\FrontendContracts\Vite\IViteManifestReader;
 use LunaPress\FrontendContracts\Vite\IViteModeDetector;
 use RuntimeException;
@@ -61,7 +62,10 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
         $dependencies = $rawDependencies;
 
         if (count($rawDependencies) === 0) {
-            $dependencies = array_map(fn($handle) => $this->assetDependencyFactory->make($handle), Constants::DEFAULT_FRONTEND_DEPS);
+            /**
+             * @var WpAssetHandle $handle
+             */
+            $dependencies = array_map(fn($handle) => $this->assetDependencyFactory->make($handle->value), Constants::DEFAULT_FRONTEND_DEPS);
         }
 
         return $dependencies;
@@ -86,7 +90,7 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
     }
 
     /**
-     * @param ViteEntryPoint[] $entryPoints
+     * @param IViteEntryPoint[] $entryPoints
      */
     private function connectDev(array $entryPoints, bool $isAdmin): void
     {
@@ -98,7 +102,7 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
     }
 
     /**
-     * @param ViteEntryPoint[] $entryPoints
+     * @param IViteEntryPoint[] $entryPoints
      * @return string
      */
     private function devScriptsHtml(array $entryPoints): string
@@ -127,7 +131,7 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
     }
 
     /**
-     * @param ViteEntryPoint[] $entryPoints
+     * @param IViteEntryPoint[] $entryPoints
      * @param array<IWpEnqueueScriptModuleDep|IAssetDependency> $dependencies
      */
     private function connectProd(array $entryPoints, array $dependencies): void
