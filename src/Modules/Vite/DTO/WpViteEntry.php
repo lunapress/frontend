@@ -1,14 +1,19 @@
 <?php
+
 declare(strict_types=1);
 
-namespace LunaPress\Frontend\Modules\Vite\Entity;
+namespace LunaPress\Frontend\Modules\Vite\DTO;
 
 use LunaPress\FrontendContracts\Vite\IViteEntry;
-
-defined('ABSPATH') || exit;
+use function preg_match;
 
 final readonly class WpViteEntry implements IViteEntry
 {
+    private bool $isCss;
+
+    /**
+     * @param string[] $css
+     */
     public function __construct(
         private string $name,
         private string $file,
@@ -16,6 +21,7 @@ final readonly class WpViteEntry implements IViteEntry
         private array $css = [],
         private ?string $src = null,
     ) {
+        $this->isCss = preg_match('/\.css$/', $file);
     }
 
     public function getName(): string
@@ -42,5 +48,10 @@ final readonly class WpViteEntry implements IViteEntry
     public function getSrc(): ?string
     {
         return $this->src;
+    }
+
+    public function isCss(): bool
+    {
+        return $this->isCss;
     }
 }

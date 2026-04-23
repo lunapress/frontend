@@ -1,11 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
-namespace LunaPress\Frontend\Modules\Vite\Entity;
+namespace LunaPress\Frontend\Modules\Vite\DTO;
 
 use LunaPress\FrontendContracts\Vite\IViteEntryPoint;
-
-defined('ABSPATH') || exit;
 
 class WpViteEntryPoint implements IViteEntryPoint
 {
