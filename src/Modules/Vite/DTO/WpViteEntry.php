@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LunaPress\Frontend\Modules\Vite\DTO;
 
 use LunaPress\FrontendContracts\Vite\IViteEntry;
-use function preg_match;
+use function str_ends_with;
 
 final readonly class WpViteEntry implements IViteEntry
 {
@@ -21,7 +21,7 @@ final readonly class WpViteEntry implements IViteEntry
         private array $css = [],
         private ?string $src = null,
     ) {
-        $this->isCss = preg_match('/\.css$/', $file);
+        $this->isCss = str_ends_with($this->file, '.css');
     }
 
     public function getName(): string
