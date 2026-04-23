@@ -8,6 +8,7 @@ use LunaPress\FrontendContracts\Vite\IViteEntryPoint;
 
 class WpViteEntryPoint implements IViteEntryPoint
 {
+    // @TODO: enum in name
     public function __construct(
         private string $name,
     ) {
