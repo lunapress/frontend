@@ -6,6 +6,7 @@ namespace LunaPress\Frontend\Modules\Vite\Service;
 
 use BackedEnum;
 use LunaPress\CoreContracts\Hook\ActionManager;
+use LunaPress\FoundationContracts\Support\Wp\WpCaster;
 use LunaPress\Frontend\Modules\Vite\Constants;
 use LunaPress\FrontendContracts\Vite\DTO\ViteAsset;
 use LunaPress\FrontendContracts\Vite\DTO\ViteConfig;
@@ -36,6 +37,7 @@ final readonly class DefaultViteAssetsLoader implements ViteAssetsLoader
         private WpEnqueueStyle $enqueueStyle,
         private WpEnqueueScript $enqueueScript,
         private ViteConfig $config,
+        private WpCaster $caster
     ) {
     }
 
@@ -150,7 +152,9 @@ final readonly class DefaultViteAssetsLoader implements ViteAssetsLoader
         );
 
         foreach ($assets as $asset) {
-            $manifestItem = $manifest->getItem($asset->name);
+            $manifestItem = $manifest->getItem(
+                $this->caster->asString($asset->name)
+            );
 
             if ($manifestItem === null) {
                 throw new RuntimeException("Vite entry '{$asset->name}' not found in manifest.");
