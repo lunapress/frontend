@@ -6,6 +6,7 @@ namespace LunaPress\Frontend\Modules\Vite\Service;
 
 use LunaPress\Frontend\Modules\Vite\Constants;
 use LunaPress\FrontendContracts\Vite\DTO\ViteConfig;
+use LunaPress\FrontendContracts\Vite\ViteManifestFactory;
 use LunaPress\FrontendContracts\Vite\ViteManifestReader;
 use LunaPress\FrontendContracts\Vite\VO\ViteManifest;
 use RuntimeException;
@@ -21,7 +22,8 @@ use const JSON_ERROR_NONE;
 final readonly class DefaultViteManifestReader implements ViteManifestReader
 {
     public function __construct(
-        private ViteConfig $config
+        private ViteConfig $config,
+        private ViteManifestFactory $viteManifestFactory,
     ) {
     }
 
@@ -44,6 +46,6 @@ final readonly class DefaultViteManifestReader implements ViteManifestReader
             throw new RuntimeException('Invalid JSON in Vite manifest: ' . json_last_error_msg());
         }
 
-        return new ViteManifest($data);
+        return $this->viteManifestFactory->make($data);
     }
 }
