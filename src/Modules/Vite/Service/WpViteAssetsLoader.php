@@ -6,6 +6,7 @@ namespace LunaPress\Frontend\Modules\Vite\Service;
 
 use BackedEnum;
 use LunaPress\CoreContracts\Hook\IActionManager;
+use LunaPress\FoundationContracts\Support\Wp\IWpCaster;
 use LunaPress\Frontend\Modules\Vite\Constants;
 use LunaPress\FrontendContracts\Vite\IViteAssetsLoader;
 use LunaPress\FrontendContracts\Vite\IViteConfig;
@@ -36,6 +37,7 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
         private WpEnqueueStyle $enqueueStyle,
         private WpEnqueueScript $enqueueScript,
         private IViteConfig $config,
+        private IWpCaster $caster,
     ) {
     }
 
