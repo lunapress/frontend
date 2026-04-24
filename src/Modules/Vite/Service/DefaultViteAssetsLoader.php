@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace LunaPress\Frontend\Modules\Vite\Service;
 
 use BackedEnum;
-use LunaPress\CoreContracts\Hook\IActionManager;
-use LunaPress\FoundationContracts\Support\Wp\IWpCaster;
+use LunaPress\CoreContracts\Hook\ActionManager;
 use LunaPress\Frontend\Modules\Vite\Constants;
-use LunaPress\FrontendContracts\Vite\IViteAssetsLoader;
-use LunaPress\FrontendContracts\Vite\IViteConfig;
-use LunaPress\FrontendContracts\Vite\IViteEntryPoint;
-use LunaPress\FrontendContracts\Vite\IViteManifestReader;
-use LunaPress\FrontendContracts\Vite\IViteModeDetector;
+use LunaPress\FrontendContracts\Vite\DTO\ViteAsset;
+use LunaPress\FrontendContracts\Vite\DTO\ViteConfig;
+use LunaPress\FrontendContracts\Vite\ViteAssetsLoader;
+use LunaPress\FrontendContracts\Vite\ViteEnvDetector;
+use LunaPress\FrontendContracts\Vite\ViteManifestReader;
 use LunaPress\Wp\Assets\Function\WpEnqueueScript;
 use LunaPress\Wp\Assets\Function\WpEnqueueScriptModule;
 use LunaPress\Wp\Assets\Function\WpEnqueueStyle;
@@ -26,32 +25,31 @@ use function count;
 use function is_string;
 use function rtrim;
 
-final readonly class WpViteAssetsLoader implements IViteAssetsLoader
+final readonly class DefaultViteAssetsLoader implements ViteAssetsLoader
 {
     public function __construct(
-        private IViteModeDetector $viteModeDetector,
-        private IViteManifestReader $viteManifestReader,
-        private IActionManager $actionManager,
+        private ViteEnvDetector $viteEnvDetector,
+        private ViteManifestReader $viteManifestReader,
+        private ActionManager $actionManager,
         private WpEnqueueScriptModule $enqueueScriptModule,
         private WpRegisterScript $registerScript,
         private WpEnqueueStyle $enqueueStyle,
         private WpEnqueueScript $enqueueScript,
-        private IViteConfig $config,
-        private IWpCaster $caster,
+        private ViteConfig $config,
     ) {
     }
 
     /**
      * @inheritDoc
      */
-    public function connect(array $entryPoints, bool $isAdmin = false, array $dependencies = []): void
+    public function connect(array $assets, bool $isAdmin = false, array $dependencies = []): void
     {
         $normalizedDependencies = $this->normalizeDependencies($dependencies);
 
-        if ($this->viteModeDetector->isDev()) {
-            $this->connectDev($entryPoints, $isAdmin);
+        if ($this->viteEnvDetector->isDev()) {
+            $this->connectDev($assets, $isAdmin);
         } else {
-            $this->connectProd($entryPoints, $normalizedDependencies);
+            $this->connectProd($assets, $normalizedDependencies);
         }
     }
 
@@ -86,21 +84,21 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
     }
 
     /**
-     * @param IViteEntryPoint[] $entryPoints
+     * @param ViteAsset[] $assets
      */
-    private function connectDev(array $entryPoints, bool $isAdmin): void
+    private function connectDev(array $assets, bool $isAdmin): void
     {
         $hook = $isAdmin ? 'admin_footer' : 'wp_footer';
 
-        $this->actionManager->add($hook, function () use ($entryPoints): void {
-            echo $this->devScriptsHtml($entryPoints);
+        $this->actionManager->add($hook, function () use ($assets): void {
+            echo $this->devScriptsHtml($assets);
         });
     }
 
     /**
-     * @param IViteEntryPoint[] $entryPoints
+     * @param ViteAsset[] $assets
      */
-    private function devScriptsHtml(array $entryPoints): string
+    private function devScriptsHtml(array $assets): string
     {
         $host = Constants::HMR_HOST;
 
@@ -117,23 +115,23 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
         HTML;
         // phpcs:enable
 
-        foreach ($entryPoints as $entry) {
+        foreach ($assets as $asset) {
             // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript
-            $scripts .= "\n<script type=\"module\" src=\"{$host}/{$entry->getName()}\"></script>";
+            $scripts .= "\n<script type=\"module\" src=\"{$host}/{$asset->name}\"></script>";
         }
 
         return $scripts;
     }
 
     /**
-     * @param IViteEntryPoint[] $entryPoints
+     * @param ViteAsset[] $assets
      * @param array<ScriptModuleDependency|string|BackedEnum> $allDependencies
      */
-    private function connectProd(array $entryPoints, array $allDependencies): void
+    private function connectProd(array $assets, array $allDependencies): void
     {
         $manifest = $this->viteManifestReader->getManifest();
-        $version  = $this->config->getPluginVersion();
-        $baseUrl  = rtrim($this->config->getBuildViteUrl(), '/');
+        $version  = $this->config->pluginVersion;
+        $baseUrl  = rtrim($this->config->buildViteUrl, '/');
         /**
          * @var ScriptModuleDependency[] $moduleDependencies
          */
@@ -151,28 +149,28 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
             )
         );
 
-        foreach ($entryPoints as $entryPoint) {
-            $entry = $manifest->getEntry($entryPoint->getName());
+        foreach ($assets as $asset) {
+            $manifestItem = $manifest->getItem($asset->name);
 
-            if ($entry === null) {
-                throw new RuntimeException("Vite entry '{$entryPoint->getName()}' not found in manifest.");
+            if ($manifestItem === null) {
+                throw new RuntimeException("Vite entry '{$asset->name}' not found in manifest.");
             }
 
-            $fileUrl = "{$baseUrl}/{$entry->getFile()}";
+            $fileUrl = "{$baseUrl}/{$manifestItem->file}";
 
             // JS
-            if (!$entry->isCss()) {
+            if (!$manifestItem->isCss) {
                 $this->connectDependencies($dependencies);
 
                 ($this->enqueueScriptModule)(
-                    id: $entry->getName(),
+                    id: $manifestItem->name,
                     src: $fileUrl,
                     deps: $moduleDependencies,
                     version: $version,
                 );
 
                 ($this->registerScript)(
-                    handle: $entry->getName(),
+                    handle: $manifestItem->name,
                     src: $fileUrl,
                     deps: $dependencies,
                     version: $version,
@@ -181,7 +179,7 @@ final readonly class WpViteAssetsLoader implements IViteAssetsLoader
             }
 
             // CSS
-            foreach ($entry->getCss() as $css) {
+            foreach ($manifestItem->css as $css) {
                 ($this->enqueueStyle)(
                     handle: $css,
                     src: "{$baseUrl}/{$css}",

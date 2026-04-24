@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace LunaPress\Frontend\Modules\Vite\Service;
 
 use LunaPress\Frontend\Modules\Vite\Constants;
-use LunaPress\Frontend\Modules\Vite\DTO\WpViteManifest;
-use LunaPress\FrontendContracts\Vite\IViteConfig;
-use LunaPress\FrontendContracts\Vite\IViteEntry;
-use LunaPress\FrontendContracts\Vite\IViteManifest;
-use LunaPress\FrontendContracts\Vite\IViteManifestReader;
+use LunaPress\FrontendContracts\Vite\DTO\ViteConfig;
+use LunaPress\FrontendContracts\Vite\ViteManifestReader;
+use LunaPress\FrontendContracts\Vite\VO\ViteManifest;
 use RuntimeException;
 use function file_exists;
 use function file_get_contents;
@@ -20,16 +18,16 @@ use function rtrim;
 use function sprintf;
 use const JSON_ERROR_NONE;
 
-final readonly class WpViteManifestReader implements IViteManifestReader
+final readonly class DefaultViteManifestReader implements ViteManifestReader
 {
     public function __construct(
-        private IViteConfig $config
+        private ViteConfig $config
     ) {
     }
 
-    public function getManifest(): IViteManifest
+    public function getManifest(): ViteManifest
     {
-        $filePath = rtrim($this->config->getBuildVitePath(), '/\\') . '/' . Constants::MANIFEST_FILE_PATH;
+        $filePath = rtrim($this->config->buildVitePath, '/\\') . '/' . Constants::MANIFEST_FILE_PATH;
 
         if (!file_exists($filePath)) {
             throw new RuntimeException(sprintf('Vite manifest file not found: %s', $filePath));
@@ -46,11 +44,6 @@ final readonly class WpViteManifestReader implements IViteManifestReader
             throw new RuntimeException('Invalid JSON in Vite manifest: ' . json_last_error_msg());
         }
 
-        return new WpViteManifest($data);
-    }
-
-    public function getEntry(string $name): ?IViteEntry
-    {
-        return $this->getManifest()->getEntry($name);
+        return new ViteManifest($data);
     }
 }
